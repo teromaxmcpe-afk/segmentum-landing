@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Segmentum — From Raw Microscopy to Results in Minutes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #06080d;
+  --bg-card: #0d1117;
+  --bg-card-hover: #151b25;
+  --accent-cyan: #00e5c8;
+  --accent-magenta: #e040a0;
+  --accent-blue: #3b82f6;
+  --text-primary: #e8ecf1;
+  --text-secondary: #8899aa;
+  --text-muted: #556677;
+  --border: #1a2233;
+  --glow-cyan: rgba(0, 229, 200, 0.15);
+  --glow-magenta: rgba(224, 64, 160, 0.1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Grain overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Animated background cells ── */
+.bg-cells {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cell-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.07;
+  animation: drift 25s ease-in-out infinite alternate;
+}
+
+.cell-blob:nth-child(1) {
+  width: 600px; height: 600px;
+  background: var(--accent-cyan);
+  top: -10%; left: -5%;
+  animation-duration: 30s;
+}
+.cell-blob:nth-child(2) {
+  width: 500px; height: 500px;
+  background: var(--accent-magenta);
+  top: 40%; right: -10%;
+  animation-duration: 22s;
+  animation-delay: -5s;
+}
+.cell-blob:nth-child(3) {
+  width: 400px; height: 400px;
+  background: var(--accent-blue);
+  bottom: -5%; left: 30%;
+  animation-duration: 28s;
+  animation-delay: -10s;
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.05); }
+  66% { transform: translate(-20px, 50px) scale(0.95); }
+  100% { transform: translate(30px, 20px) scale(1.02); }
+}
+
+/* ── Layout ── */
+.content { position: relative; z-index: 1; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+/* ── Nav ── */
+nav {
+  padding: 24px 0;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  backdrop-filter: blur(20px);
+  background: rgba(6, 8, 13, 0.7);
+  border-bottom: 1px solid var(--border);
+}
+
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+.logo span { color: var(--accent-cyan); }
+
+nav a.nav-cta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--bg-deep);
+  background: var(--accent-cyan);
+  padding: 10px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+nav a.nav-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px var(--glow-cyan);
+}
+
+/* ── Hero ── */
+.hero {
+  padding: 180px 0 100px;
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  background: rgba(0, 229, 200, 0.08);
+  border: 1px solid rgba(0, 229, 200, 0.2);
+  padding: 6px 16px;
+  border-radius: 100px;
+  margin-bottom: 32px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  animation: fadeUp 0.8s ease both;
+}
+
+.hero-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.8rem, 6vw, 4.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  animation: fadeUp 0.8s ease 0.1s both;
+}
+
+h1 .highlight {
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto 48px;
+  line-height: 1.7;
+  animation: fadeUp 0.8s ease 0.2s both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Email form ── */
+.waitlist-form {
+  display: flex;
+  gap: 10px;
+  max-width: 480px;
+  margin: 0 auto 20px;
+  animation: fadeUp 0.8s ease 0.3s both;
+}
+
+.waitlist-form input {
+  flex: 1;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.waitlist-form input:focus {
+  border-color: var(--accent-cyan);
+}
+
+.waitlist-form input::placeholder {
+  color: var(--text-muted);
+}
+
+.waitlist-form button {
+  padding: 16px 28px;
+  background: var(--accent-cyan);
+  color: var(--bg-deep);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.waitlist-form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px var(--glow-cyan);
+}
+
+.form-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  animation: fadeUp 0.8s ease 0.35s both;
+}
+
+.form-success {
+  display: none;
+  padding: 16px 24px;
+  background: rgba(0, 229, 200, 0.08);
+  border: 1px solid rgba(0, 229, 200, 0.25);
+  border-radius: 10px;
+  color: var(--accent-cyan);
+  font-weight: 500;
+  max-width: 480px;
+  margin: 0 auto 20px;
+}
+
+/* ── Demo visual ── */
+.demo-section {
+  padding: 40px 0 100px;
+  animation: fadeUp 0.8s ease 0.4s both;
+}
+
+.demo-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.demo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.demo-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.demo-dot:nth-child(1) { background: #ff5f57; }
+.demo-dot:nth-child(2) { background: #febc2e; }
+.demo-dot:nth-child(3) { background: #28c840; }
+
+.demo-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.demo-body {
+  display: grid;
+  grid-template-columns: 1fr 60px 1fr;
+  align-items: center;
+  gap: 0;
+  padding: 40px;
+}
+
+.demo-panel {
+  position: relative;
+}
+
+.demo-panel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.demo-image {
+  width: 100%;
+  aspect-ratio: 4/3;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.demo-raw {
+  background: linear-gradient(135deg, #0a0f18 0%, #111a2a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Simulated microscopy cells */
+.micro-canvas {
+  width: 100%; height: 100%;
+  position: relative;
+}
+
+.micro-cell {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(100, 200, 150, 0.3);
+  background: radial-gradient(circle at 40% 40%, rgba(80, 180, 130, 0.15), transparent 70%);
+}
+
+.micro-cell:nth-child(1) { width: 22%; height: 29%; top: 10%; left: 15%; }
+.micro-cell:nth-child(2) { width: 18%; height: 24%; top: 5%; left: 55%; }
+.micro-cell:nth-child(3) { width: 25%; height: 33%; top: 35%; left: 35%; }
+.micro-cell:nth-child(4) { width: 16%; height: 21%; top: 55%; left: 10%; }
+.micro-cell:nth-child(5) { width: 20%; height: 26%; top: 50%; left: 65%; }
+.micro-cell:nth-child(6) { width: 14%; height: 18%; top: 75%; left: 40%; }
+.micro-cell:nth-child(7) { width: 19%; height: 25%; top: 20%; left: 75%; }
+
+.micro-nucleus {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 45%, rgba(60, 160, 220, 0.4), rgba(40, 100, 180, 0.1));
+  top: 25%; left: 25%;
+  width: 50%; height: 50%;
+}
+
+.demo-segmented {
+  background: linear-gradient(135deg, #080d14 0%, #0d1520 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seg-cell {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid;
+  background: none;
+}
+
+.seg-cell:nth-child(1) { width: 22%; height: 29%; top: 10%; left: 15%; border-color: #00e5c8; background: rgba(0, 229, 200, 0.08); }
+.seg-cell:nth-child(2) { width: 18%; height: 24%; top: 5%; left: 55%; border-color: #e040a0; background: rgba(224, 64, 160, 0.08); }
+.seg-cell:nth-child(3) { width: 25%; height: 33%; top: 35%; left: 35%; border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+.seg-cell:nth-child(4) { width: 16%; height: 21%; top: 55%; left: 10%; border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.seg-cell:nth-child(5) { width: 20%; height: 26%; top: 50%; left: 65%; border-color: #00e5c8; background: rgba(0, 229, 200, 0.08); }
+.seg-cell:nth-child(6) { width: 14%; height: 18%; top: 75%; left: 40%; border-color: #a78bfa; background: rgba(167, 139, 250, 0.08); }
+.seg-cell:nth-child(7) { width: 19%; height: 25%; top: 20%; left: 75%; border-color: #e040a0; background: rgba(224, 64, 160, 0.08); }
+
+.seg-label {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 4px;
+  top: 4px; right: 4px;
+}
+
+.seg-cell:nth-child(1) .seg-label { color: #00e5c8; background: rgba(0,229,200,0.15); }
+.seg-cell:nth-child(2) .seg-label { color: #e040a0; background: rgba(224,64,160,0.15); }
+.seg-cell:nth-child(3) .seg-label { color: #3b82f6; background: rgba(59,130,246,0.15); }
+.seg-cell:nth-child(4) .seg-label { color: #f59e0b; background: rgba(245,158,11,0.15); }
+.seg-cell:nth-child(5) .seg-label { color: #00e5c8; background: rgba(0,229,200,0.15); }
+.seg-cell:nth-child(6) .seg-label { color: #a78bfa; background: rgba(167,139,250,0.15); }
+.seg-cell:nth-child(7) .seg-label { color: #e040a0; background: rgba(224,64,160,0.15); }
+
+.demo-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-cyan);
+}
+
+.demo-arrow svg {
+  width: 32px; height: 32px;
+  animation: arrow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes arrow-pulse {
+  0%, 100% { opacity: 0.5; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(4px); }
+}
+
+.demo-arrow-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+}
+
+/* ── Stats bar ── */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+}
+
+.stat {
+  background: var(--bg-card);
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.stat-value {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.6rem;
+  color: var(--accent-cyan);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Features ── */
+.features {
+  padding: 80px 0;
+}
+
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-cyan);
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 60px;
+  line-height: 1.15;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px 28px;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(0, 229, 200, 0.2);
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+}
+
+.feature-icon.cyan { background: rgba(0, 229, 200, 0.1); }
+.feature-icon.magenta { background: rgba(224, 64, 160, 0.1); }
+.feature-icon.blue { background: rgba(59, 130, 246, 0.1); }
+
+.feature-card h3 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.feature-card p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+/* ── How it works ── */
+.how-it-works {
+  padding: 80px 0;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  counter-reset: step;
+}
+
+.step {
+  position: relative;
+  padding: 36px 28px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  counter-increment: step;
+}
+
+.step::before {
+  content: counter(step, decimal-leading-zero);
+  font-family: 'DM Serif Display', serif;
+  font-size: 3rem;
+  color: rgba(0, 229, 200, 0.1);
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  line-height: 1;
+}
+
+.step h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.step p {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+/* ── Use cases ── */
+.use-cases {
+  padding: 80px 0;
+}
+
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.use-case {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  gap: 16px;
+  align-items: start;
+  transition: border-color 0.3s;
+}
+
+.use-case:hover { border-color: rgba(0, 229, 200, 0.2); }
+
+.use-case-marker {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.use-case h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.use-case p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ── CTA ── */
+.cta-section {
+  padding: 100px 0;
+  text-align: center;
+}
+
+.cta-box {
+  background: linear-gradient(135deg, rgba(0, 229, 200, 0.05), rgba(224, 64, 160, 0.03));
+  border: 1px solid rgba(0, 229, 200, 0.15);
+  border-radius: 20px;
+  padding: 64px 40px;
+}
+
+.cta-box h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+
+.cta-box p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin-bottom: 36px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+/* ── Footer ── */
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+footer p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .features-grid,
+  .steps {
+    grid-template-columns: 1fr;
+  }
+  .use-cases-grid {
+    grid-template-columns: 1fr;
+  }
+  .demo-body {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 24px;
+  }
+  .demo-arrow {
+    transform: rotate(90deg);
+  }
+  .demo-arrow-label {
+    writing-mode: horizontal-tb;
+    transform: rotate(0deg);
+  }
+  .stats-bar {
+    grid-template-columns: 1fr;
+  }
+  .waitlist-form {
+    flex-direction: column;
+  }
+  .hero { padding: 140px 0 60px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-cells">
+  <div class="cell-blob"></div>
+  <div class="cell-blob"></div>
+  <div class="cell-blob"></div>
+</div>
+
+<div class="content">
+
+<!-- Nav -->
+<nav>
+  <div class="container">
+    <a href="#" class="logo">Segmen<span>tum</span></a>
+    <a href="#waitlist" class="nav-cta">Join Waitlist</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">Coming Soon — Early Access 2026</div>
+    <h1>From raw microscopy<br>to <span class="highlight">results in minutes</span></h1>
+    <p class="hero-sub">Upload your images. Get publication-ready segmentation, quantification, and figures — no code, no GPU setup, no headaches.</p>
+    <div id="waitlist">
+      <form class="waitlist-form" id="waitlistForm">
+        <input type="email" placeholder="you@university.edu" required id="emailInput">
+        <button type="submit">Get Early Access</button>
+      </form>
+      <div class="form-success" id="formSuccess">You're on the list! We'll reach out soon.</div>
+    </div>
+    <p class="form-note">Free for academic labs during beta. No credit card needed.</p>
+  </div>
+</section>
+
+<!-- Demo Visual -->
+<section class="demo-section">
+  <div class="container">
+    <div class="demo-card">
+      <div class="demo-header">
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+        <span class="demo-title">segmentum — MDCK_cyst_48h.tif</span>
+      </div>
+      <div class="demo-body">
+        <!-- Raw image -->
+        <div class="demo-panel">
+          <div class="demo-panel-label">Raw Input</div>
+          <div class="demo-image demo-raw">
+            <div class="micro-canvas">
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+              <div class="micro-cell"><div class="micro-nucleus"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="demo-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </div>
+
+        <!-- Segmented -->
+        <div class="demo-panel">
+          <div class="demo-panel-label">Segmented Output</div>
+          <div class="demo-image demo-segmented">
+            <div class="micro-canvas">
+              <div class="seg-cell"><span class="seg-label">C1</span></div>
+              <div class="seg-cell"><span class="seg-label">C2</span></div>
+              <div class="seg-cell"><span class="seg-label">C3</span></div>
+              <div class="seg-cell"><span class="seg-label">C4</span></div>
+              <div class="seg-cell"><span class="seg-label">C5</span></div>
+              <div class="seg-cell"><span class="seg-label">C6</span></div>
+              <div class="seg-cell"><span class="seg-label">C7</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-bar">
+        <div class="stat">
+          <div class="stat-value">7</div>
+          <div class="stat-label">Cells Detected</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">2,847 µm³</div>
+          <div class="stat-label">Avg Cell Volume</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">4.2s</div>
+          <div class="stat-label">Processing Time</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Analysis that used to take days.<br>Now takes minutes.</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon cyan">🔬</div>
+        <h3>Any Microscope, Any Format</h3>
+        <p>Upload .tif, .czi, .nd2, .lif, or .ome.tiff stacks. We auto-detect voxel sizes, channels, and time points from metadata.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon magenta">🧠</div>
+        <h3>One-Click Segmentation</h3>
+        <p>State-of-the-art deep learning models for cells, nuclei, organoids, and more. No parameter tuning. No Python environments. Just results.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon blue">📊</div>
+        <h3>Publication-Ready Output</h3>
+        <p>Quantified metrics, time-series plots, and figure panels with proper scale bars — formatted for your next paper.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon blue">⚡</div>
+        <h3>Cloud GPUs, Zero Setup</h3>
+        <p>We handle the compute. No CUDA drivers, no conda environments, no "it worked on my machine." Just upload and go.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon cyan">🎯</div>
+        <h3>Train Your Own Models</h3>
+        <p>Upload 10-20 annotated images and we'll fine-tune a model for your specific cell type, staining, or organism. No ML expertise needed.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon magenta">🔄</div>
+        <h3>Batch Processing</h3>
+        <p>Screen hundreds of conditions at once. Upload entire experiments and get back quantified comparisons across all your samples.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="how-it-works">
+  <div class="container">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Three steps. That's it.</h2>
+    <div class="steps">
+      <div class="step">
+        <h3>Upload your images</h3>
+        <p>Drag and drop your microscopy stacks. We support all major formats and automatically read your acquisition metadata.</p>
+      </div>
+      <div class="step">
+        <h3>Pick an analysis pipeline</h3>
+        <p>Choose from pre-built workflows — cell segmentation, nuclei counting, organoid morphometrics, time-lapse tracking — or build custom ones.</p>
+      </div>
+      <div class="step">
+        <h3>Download your results</h3>
+        <p>Get segmentation masks, measurements as CSV, interactive plots, and figure panels ready for your manuscript. All in minutes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Use Cases -->
+<section class="use-cases">
+  <div class="container">
+    <div class="section-label">Built For</div>
+    <h2 class="section-title">Every lab that owns a microscope.</h2>
+    <div class="use-cases-grid">
+      <div class="use-case">
+        <div class="use-case-marker"></div>
+        <div>
+          <h4>3D Cell Culture & Organoids</h4>
+          <p>Segment cysts, measure lumen volumes, track growth dynamics over time in your 3D cultures.</p>
+        </div>
+      </div>
+      <div class="use-case">
+        <div class="use-case-marker"></div>
+        <div>
+          <h4>High-Content Screening</h4>
+          <p>Process thousands of images from plate-based assays. Automated phenotype classification and hit calling.</p>
+        </div>
+      </div>
+      <div class="use-case">
+        <div class="use-case-marker"></div>
+        <div>
+          <h4>Developmental Biology</h4>
+          <p>Track cell divisions, lineage, and morphogenesis across time-lapse datasets in embryos and tissues.</p>
+        </div>
+      </div>
+      <div class="use-case">
+        <div class="use-case-marker"></div>
+        <div>
+          <h4>Neuroscience & Histology</h4>
+          <p>Count neurons, trace dendrites, segment brain regions — in fluorescence or brightfield sections.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-box">
+      <h2>Stop wrestling with code.<br>Start publishing faster.</h2>
+      <p>Join the waitlist and be the first to try Segmentum when we launch. Free for academic labs during beta.</p>
+      <form class="waitlist-form" id="waitlistForm2">
+        <input type="email" placeholder="you@university.edu" required id="emailInput2">
+        <button type="submit">Get Early Access</button>
+      </form>
+      <div class="form-success" id="formSuccess2">You're on the list! We'll reach out soon.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <p>Segmentum © 2026 · Built by scientists, for scientists · <a href="mailto:hello@segmentum.ai">hello@segmentum.ai</a></p>
+  </div>
+</footer>
+
+</div>
+
+<script>
+function handleSubmit(formId, successId) {
+  const form = document.getElementById(formId);
+  const success = document.getElementById(successId);
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    form.style.display = 'none';
+    success.style.display = 'block';
+  });
+}
+
+handleSubmit('waitlistForm', 'formSuccess');
+handleSubmit('waitlistForm2', 'formSuccess2');
+</script>
+
+</body>
+</html>
